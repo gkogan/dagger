@@ -63,6 +63,7 @@ func (proto ModuleSourceKind) HumanString() string {
 
 type SDKConfig struct {
 	Source string `field:"true" name:"source" doc:"Source of the SDK. Either a name of a builtin SDK or a module source ref string pointing to the SDK's implementation."`
+	Config map[string]interface{}
 }
 
 func (*SDKConfig) Type() *ast.Type {
@@ -281,6 +282,17 @@ func (src *ModuleSource) CalcDigest() digest.Digest {
 		if client.Dev != nil {
 			inputs = append(inputs, fmt.Sprintf("%t", *client.Dev))
 		}
+	}
+
+	// For git sources, we currently need to mix in the actual git endpoint
+	// in order to ensure that we don't get cache hits on repositories that
+	// have the same content but different auth. If we get a cache hit on
+	// a repo we don't have auth for subsequent operations can break.
+	// Given that scenarios in which two different git repos have the exact
+	// same bit-by-bit module source are expected to be rare, this shouldn't
+	// be a big compromise.
+	if src.Git != nil {
+		inputs = append(inputs, src.Git.CloneRef)
 	}
 
 	return dagql.HashFrom(inputs...)
